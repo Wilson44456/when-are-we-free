@@ -65,28 +65,42 @@ const localDb = {
 // ---------------------------------------------------------
 const kvDb = {
     getEvent: async (id: string): Promise<EventData | null> => {
-        return await kv.get<EventData>(`event:${id}`);
+        try {
+            return await kv.get<EventData>(`event:${id}`);
+        } catch (error) {
+            console.error("KV getEvent Error:", error);
+            return null;
+        }
     },
 
     createEvent: async (event: EventData) => {
-        await kv.set(`event:${event.id}`, event);
-        return event;
+        try {
+            await kv.set(`event:${event.id}`, event);
+            return event;
+        } catch (error) {
+            console.error("KV createEvent Error:", error);
+            throw new Error("Failed to save event to cloud database.");
+        }
     },
 
     addVote: async (eventId: string, vote: Vote) => {
-        // We need to fetch, update, and save back (Optimistic locking omitted for simplicity)
-        const event = await kv.get<EventData>(`event:${eventId}`);
-        if (!event) return null;
+        try {
+            const event = await kv.get<EventData>(`event:${eventId}`);
+            if (!event) return null;
 
-        const existingIdx = event.participants.findIndex(p => p.user === vote.user);
-        if (existingIdx >= 0) {
-            event.participants[existingIdx] = vote;
-        } else {
-            event.participants.push(vote);
+            const existingIdx = event.participants.findIndex(p => p.user === vote.user);
+            if (existingIdx >= 0) {
+                event.participants[existingIdx] = vote;
+            } else {
+                event.participants.push(vote);
+            }
+
+            await kv.set(`event:${eventId}`, event);
+            return event;
+        } catch (error) {
+            console.error("KV addVote Error:", error);
+            return null;
         }
-
-        await kv.set(`event:${eventId}`, event);
-        return event;
     }
 };
 
@@ -95,5 +109,10 @@ const kvDb = {
 // ---------------------------------------------------------
 // Auto-switch: Use KV if env vars are present, otherwise use local file
 const useKv = !!process.env.KV_REST_API_URL;
+
+if (process.env.NODE_ENV === 'production') {
+    console.log(`[DB] Running in PRODUCTION mode. Using KV: ${useKv}`);
+    if (!useKv) console.warn("[DB] WARNING: KV_REST_API_URL not found! Data will NOT be saved.");
+}
 
 export const db = useKv ? kvDb : localDb;
