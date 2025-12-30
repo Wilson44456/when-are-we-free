@@ -17,7 +17,6 @@ export default function EventPage({ params }: { params: { id: string } }) {
     const [event, setEvent] = useState<EventData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [mounted, setMounted] = useState(false); // Anti-hydration mismatch
 
     // User State
     const [guestName, setGuestName] = useState('');
@@ -51,7 +50,6 @@ export default function EventPage({ params }: { params: { id: string } }) {
 
     // Initial Load + Polling Setup
     useEffect(() => {
-        setMounted(true);
         // Determine user from LocalStorage
         const savedName = localStorage.getItem(`event_user_${params.id}`);
         if (savedName) {
@@ -178,10 +176,6 @@ export default function EventPage({ params }: { params: { id: string } }) {
         });
         return counts;
     }, [event]);
-
-    if (!mounted) {
-        return <div className="min-h-screen bg-slate-50 dark:bg-slate-950" />;
-    }
 
     if (loading && isFirstLoad.current) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;

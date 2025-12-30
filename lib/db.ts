@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { kv } from '@vercel/kv';
 
 // Types
 export interface Vote {
@@ -15,40 +14,39 @@ export interface EventData {
     participants: Vote[];
 }
 
-// ---------------------------------------------------------
-// Local FileSystem Implementation (for Development)
-// ---------------------------------------------------------
 const DB_PATH = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_PATH, 'events.json');
 
-const ensureLocalDbInit = () => {
-    if (!fs.existsSync(DB_PATH)) fs.mkdirSync(DB_PATH);
-    if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, JSON.stringify({}));
-};
+// Ensure DB exists
+if (!fs.existsSync(DB_PATH)) {
+    fs.mkdirSync(DB_PATH);
+}
+if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, JSON.stringify({}));
+}
 
-const localDb = {
-    getEvent: async (id: string): Promise<EventData | null> => {
-        ensureLocalDbInit();
+// Helpers
+export const db = {
+    getEvent: (id: string): EventData | null => {
         const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
         return data[id] || null;
     },
 
-    createEvent: async (event: EventData) => {
-        ensureLocalDbInit();
+    createEvent: (event: EventData) => {
         const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
         data[event.id] = event;
         fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
         return event;
     },
 
-    addVote: async (eventId: string, vote: Vote) => {
-        ensureLocalDbInit();
+    addVote: (eventId: string, vote: Vote) => {
         const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
         if (!data[eventId]) return null;
 
         const event = data[eventId] as EventData;
-        const existingIdx = event.participants.findIndex(p => p.user === vote.user);
 
+        // Check if user already voted, update if so
+        const existingIdx = event.participants.findIndex(p => p.user === vote.user);
         if (existingIdx >= 0) {
             event.participants[existingIdx] = vote;
         } else {
@@ -59,60 +57,3 @@ const localDb = {
         return event;
     }
 };
-
-// ---------------------------------------------------------
-// Vercel KV Implementation (for Production)
-// ---------------------------------------------------------
-const kvDb = {
-    getEvent: async (id: string): Promise<EventData | null> => {
-        try {
-            return await kv.get<EventData>(`event:${id}`);
-        } catch (error) {
-            console.error("KV getEvent Error:", error);
-            return null;
-        }
-    },
-
-    createEvent: async (event: EventData) => {
-        try {
-            await kv.set(`event:${event.id}`, event);
-            return event;
-        } catch (error) {
-            console.error("KV createEvent Error:", error);
-            throw new Error("Failed to save event to cloud database.");
-        }
-    },
-
-    addVote: async (eventId: string, vote: Vote) => {
-        try {
-            const event = await kv.get<EventData>(`event:${eventId}`);
-            if (!event) return null;
-
-            const existingIdx = event.participants.findIndex(p => p.user === vote.user);
-            if (existingIdx >= 0) {
-                event.participants[existingIdx] = vote;
-            } else {
-                event.participants.push(vote);
-            }
-
-            await kv.set(`event:${eventId}`, event);
-            return event;
-        } catch (error) {
-            console.error("KV addVote Error:", error);
-            return null;
-        }
-    }
-};
-
-// ---------------------------------------------------------
-// Export Logic
-// ---------------------------------------------------------
-// Auto-switch: Use KV if env vars are present, otherwise use local file
-const useKv = !!process.env.KV_REST_API_URL;
-
-if (process.env.NODE_ENV === 'production') {
-    console.log(`[DB] Running in PRODUCTION mode. Using KV: ${useKv}`);
-    if (!useKv) console.warn("[DB] WARNING: KV_REST_API_URL not found! Data will NOT be saved.");
-}
-
-export const db = useKv ? kvDb : localDb;

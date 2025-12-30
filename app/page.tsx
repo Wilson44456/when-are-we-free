@@ -57,14 +57,6 @@ export default function Home() {
                 ))}
             </div>
 
-            <footer className="mt-20 text-slate-400 text-sm flex flex-col items-center gap-2">
-                <p>© 2024 Event Planner. No login required.</p>
-                <p className="text-xs opacity-50 font-mono">
-                    System: {process.env.NODE_ENV} |
-                    Mode: {process.env.KV_REST_API_URL ? 'Cloud (KV)' : 'Local (JSON)'}
-                </p>
-            </footer>
-
         </main>
     );
 }
