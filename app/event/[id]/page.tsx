@@ -169,10 +169,16 @@ export default function EventPage({ params }: { params: { id: string } }) {
     const heatmapData = React.useMemo(() => {
         if (!event) return {};
         const counts: Record<string, number> = {};
-        event.participants.forEach(p => {
-            p.slots.forEach(slot => {
-                counts[slot] = (counts[slot] || 0) + 1;
-            });
+
+        // Safety check: ensure participants exists and is an array
+        const participants = Array.isArray(event.participants) ? event.participants : [];
+
+        participants.forEach(p => {
+            if (Array.isArray(p.slots)) {
+                p.slots.forEach(slot => {
+                    counts[slot] = (counts[slot] || 0) + 1;
+                });
+            }
         });
         return counts;
     }, [event]);
@@ -294,7 +300,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
                         Event Availability 🗓️
                     </h1>
                     <p className="text-slate-500 flex items-center justify-center gap-2">
-                        <User className="w-4 h-4" /> {event.participants.length} responded
+                        <User className="w-4 h-4" /> {event.participants?.length || 0} responded
                         {/* Visual indicator for polling */}
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-2" title="Live updates active"></span>
                     </p>
