@@ -354,7 +354,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
                         initialSlots={mySlots}
                         mode={viewMode}
                         heatmapData={heatmapData}
-                        maxParticipants={event.participants.length || 1}
+                        maxParticipants={event.participants?.length || 1}
                     />
                 </div>
 
