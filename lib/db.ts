@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
 
 // Types
 export interface Vote {
@@ -61,33 +61,42 @@ const localDb = {
     }
 };
 
-// --- Vercel KV Implementation (For Production) ---
-const kvDb = {
+// --- Redis Implementation (Production / Standard Redis) ---
+// Only initialize if REDIS_URL is present to prevent connection errors in dev
+const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
+
+const redisDb = {
     getEvent: async (id: string): Promise<EventData | null> => {
-        return await kv.get<EventData>(`event:${id}`);
+        if (!redis) return null;
+        const data = await redis.get(`event:${id}`);
+        return data ? JSON.parse(data) : null;
     },
 
     createEvent: async (event: EventData) => {
-        await kv.set(`event:${event.id}`, event);
+        if (!redis) throw new Error("Redis not configured");
+        await redis.set(`event:${event.id}`, JSON.stringify(event));
         return event;
     },
 
     addVote: async (eventId: string, vote: Vote) => {
-        // Fetch, Update, Save (Basic pattern)
-        const event = await kv.get<EventData>(`event:${eventId}`);
-        if (!event) return null;
+        if (!redis) throw new Error("Redis not configured");
+        // Optimistic locking / Transaction recommended for high concurrency but okay for MVP
+        const data = await redis.get(`event:${eventId}`);
+        if (!data) return null;
 
+        const event = JSON.parse(data) as EventData;
         const existingIdx = event.participants.findIndex(p => p.user === vote.user);
+
         if (existingIdx >= 0) {
             event.participants[existingIdx] = vote;
         } else {
             event.participants.push(vote);
         }
 
-        await kv.set(`event:${eventId}`, event);
+        await redis.set(`event:${eventId}`, JSON.stringify(event));
         return event;
     }
 };
 
-// Export correct implementation
-export const db = process.env.NODE_ENV === 'production' ? kvDb : localDb;
+// Export Logic: Prefer Redis if configured, otherwise fallback to local file
+export const db = redis ? redisDb : localDb;
