@@ -61,7 +61,10 @@ export default function EventPage({ params }: { params: { id: string } }) {
         fetchEvent(true).then((data) => {
             // Restore slots if user exists
             if (savedName && data) {
-                const myVote = data.participants.find(p => p.user === savedName);
+                // Safety check: ensure participants exists
+                const participants = Array.isArray(data.participants) ? data.participants : [];
+                const myVote = participants.find(p => p.user === savedName);
+
                 if (myVote) {
                     setMySlots(myVote.slots);
                     // Automatically show heatmap if I've already voted
@@ -89,7 +92,8 @@ export default function EventPage({ params }: { params: { id: string } }) {
 
         // Check if this user already has data on server
         if (event) {
-            const myVote = event.participants.find(p => p.user === guestName);
+            const participants = Array.isArray(event.participants) ? event.participants : [];
+            const myVote = participants.find(p => p.user === guestName);
             if (myVote) {
                 setMySlots(myVote.slots);
                 if (myVote.slots.length > 0) setViewMode('heatmap');
