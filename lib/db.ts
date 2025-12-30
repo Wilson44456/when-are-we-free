@@ -74,7 +74,8 @@ const redisDb = {
 
     createEvent: async (event: EventData) => {
         if (!redis) throw new Error("Redis not configured");
-        await redis.set(`event:${event.id}`, JSON.stringify(event));
+        // Save event via Redis, set to auto-expire in 90 days (7776000 seconds)
+        await redis.set(`event:${event.id}`, JSON.stringify(event), 'EX', 7776000);
         return event;
     },
 
@@ -93,7 +94,8 @@ const redisDb = {
             event.participants.push(vote);
         }
 
-        await redis.set(`event:${eventId}`, JSON.stringify(event));
+        // Save and refresh expiration (another 90 days)
+        await redis.set(`event:${eventId}`, JSON.stringify(event), 'EX', 7776000);
         return event;
     }
 };

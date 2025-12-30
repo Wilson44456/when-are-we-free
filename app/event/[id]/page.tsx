@@ -31,6 +31,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
 
     // Polling Ref
     const isFirstLoad = useRef(true);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // 1. Fetch Event & Polling
     const fetchEvent = async (showLoading = false) => {
@@ -73,13 +74,44 @@ export default function EventPage({ params }: { params: { id: string } }) {
             }
             isFirstLoad.current = false;
         });
+    }, [params.id]);
 
-        // Start Polling (every 3 seconds)
-        const interval = setInterval(() => {
-            fetchEvent(false);
-        }, 3000);
+    // Start Polling (Smart Polling)
+    useEffect(() => {
+        const startPolling = () => {
+            // Clear existing to avoid duplicates
+            if (intervalRef.current) clearInterval(intervalRef.current);
 
-        return () => clearInterval(interval);
+            intervalRef.current = setInterval(() => {
+                // Save quota: Only poll if tab is visible
+                if (!document.hidden) {
+                    fetchEvent(false);
+                }
+            }, 5000); // Poll every 5 seconds instead of 3
+        };
+
+        const stopPolling = () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                // Immediate fetch when user comes back
+                fetchEvent(false);
+                startPolling();
+            }
+        };
+
+        // Initialize
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        startPolling();
+
+        return () => {
+            stopPolling();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [params.id]);
 
     // 2. Handle Login / Name Set
