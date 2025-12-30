@@ -18,7 +18,7 @@ export async function POST(request: Request) {
             participants: []
         };
 
-        db.createEvent(newEvent);
+        await db.createEvent(newEvent);
 
         return NextResponse.json({ id: newEvent.id });
     } catch (e) {

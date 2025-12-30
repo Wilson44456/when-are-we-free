@@ -10,7 +10,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
             return NextResponse.json({ error: 'User name required' }, { status: 400 });
         }
 
-        const updatedEvent = db.addVote(params.id, { user, slots });
+        const updatedEvent = await db.addVote(params.id, { user, slots });
 
         if (!updatedEvent) {
             return NextResponse.json({ error: 'Event not found' }, { status: 404 });
